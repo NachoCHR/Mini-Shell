@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <algorithm>
-#include <libexplain/execvp.h>
+//#include <libexplain/execvp.h>
 
 //#include <bits/stdc++.h>
 //typedef cdo =  'cd /home/test/' 
@@ -41,7 +41,7 @@ int main()
         {
             string Chain2;
             stringstream S2(Chain1); 
-            while(getline(S2, Chain2 , ' ')){
+            while(getline(S2, Chain2 , ' ')){ // como                 estas
                 command.push_back(Chain2);
             }
             command.erase(std::remove(command.begin(), command.end(), ""), command.end());
@@ -63,9 +63,9 @@ int main()
             if(pid == 0){        
                 pront = true;
                 int exeret = execvp(ArgsCommand[0],ArgsCommand);
-                fprintf(stderr, "%s\n", Explain_execvp(ArgsCommand[0],ArgsCommand));
+                //fprintf(stderr, "%s\n", Explain_execvp(ArgsCommand[0],ArgsCommand));
                 exit(errno);
-            }else if(pid < 0){
+            }else if(pid < 0){      
                 cout << "ERROR";
                 // ERROR;
             }
