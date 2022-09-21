@@ -1,23 +1,22 @@
 #include <iostream>
 #include <stdlib.h>
 #include <string>
+#include <string.h>
 #include <vector>
 #include <istream>
 #include <sstream>
+#include <fstream>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <algorithm>
 #include <sys/resource.h>
 using namespace std;
 
-//#include <libexplain/execvp.h>
-
-//#include <bits/stdc++.h>
-//typedef cdo =  'cd /home/test/' 
-
-
 const int READ = 0; // variable para pipe
 const int WRITE = 1; // variable para pipe
+vector<vector<string> > All;
+    vector<string> command;
+    string instruction;
 
 void sig_handler(int sig){      // manejador de signals
     cout << " Decia continuar la ejecución de la Shell: (Y/N)" << endl;    
@@ -29,34 +28,38 @@ void sig_handler(int sig){      // manejador de signals
             printf("Adios");
             exit(0);
         }else if(Answer == 'Y'){
+            All.clear();
+            instruction.clear();
+            command.clear();
             break;
         }
     }
-    
 }
 
 int main()
 {
     signal(SIGINT,sig_handler);
-    struct rusage process;
-    struct timeval UStart, USend, Sstart, Send;          
+    struct rusage start,end;
+    long int usertime, systime;
     long maxrss = 0;                                              
-    getrusage(RUSAGE_CHILDREN , &process);
-    vector<vector<string> > All;
-    vector<string> command;
-    string instruction;
+    //vector<vector<string> > All;
     bool pront = true;
     cout << "$";
+    ofstream archivo;
     long long maxim;
+    //archivo.clear();
+    bool dates = false; // Flag of the recurses, if is true. write , else close
     while (getline(cin,instruction)){ 
+        cout << "comando : " << instruction<< endl;
         maxim = 0;
-        if(pront) cout << "$";
-        //pront = false;
+        //if(pront) cout << "$";
+        pront = false;
         string Chain1;
         if(instruction == "exit"){
             return 0;
-        }else if(instruction == "\n"){
+        }else if(instruction.size() == 0 ){
             pront = true;
+            cout << "juju:";
             continue;
         }
         stringstream S1(instruction);
@@ -73,32 +76,68 @@ int main()
             All.push_back(command);
             command.clear();
         }
+        getrusage(RUSAGE_SELF , &start);
         // Case only one command
-        UStart = process.ru_utime;  // IINICIALIZED USER TIME OF THE PROCESS;
-        Sstart = process.ru_utime;  // IINICIALIZED SYS TIME OF THE PROCESS;
+
+        // Caso para abrir el archivo recursos.log, es decir == 3 para pdoer verifficar que sea ese comandoapra comenzar la escritura de datos
+        // si el tamano es 2 es para cortar la escirutra 
+        if(All[0].size() == 3){
+            string L = All[0][0] + " " + All[0][1] + " " + All[0][2];
+            if(L == "usorecursos start recursos.log"){
+                dates = true;
+                string nombreArchivo = "recursos.log";
+		                            // OPEN FILE
+		        archivo.open(nombreArchivo.c_str(), fstream::out);
+		                        // WRITE IN THE DILE
+		        archivo << "comando" << '\t' << "tuser" << '\t'<< "tsys" << '\t' << "maxrss" << '\t' << endl;
+                All.clear();
+                cout << endl;
+                cout << "$";   
+                continue;
+            }
+        }else if(All[0].size() == 2 && dates == true){
+            string L = All[0][0] + " " + All[0][1];
+            if(L == "usorecursos stop" && dates == true){
+                archivo.close();
+                cout << endl;
+                cout << "$";   
+                All.clear();
+                continue;
+            }
+        }
+
+// -------------------  CASO DE UNA LIENA DE COMANDO COMO ls - la sin necesidad de pipe's ----------------------- //
+
         if( All.size() <= 1){
+            cout << "Cai aca";
             char *ArgsCommand[All[0].size() + 1];
             int i = 0;
             for(i; i < All[0].size(); i++){
                 ArgsCommand[i] = strdup(All[0][i].c_str());
             }
             ArgsCommand[i] = NULL;
-            
             int pid = fork();
             if(pid == 0){        
                 pront = true;
                 int exeret = execvp(ArgsCommand[0],ArgsCommand);
-                //fprintf(stderr, "%s\n", Explain_execvp(ArgsCommand[0],ArgsCommand));
-                exit(errno);
+                
+                //fprintf(stderr, "%s\n", explain_execvp(ArgsCommand[0],ArgsCommand));
+                exit(EXIT_FAILURE);
             }else if(pid < 0){      
                 cout << "ERROR";
                 // ERROR;
             }
             else{
-                //wait(NULL);
+                wait(NULL);
 
             }
-        }else{      // Case find pipe
+        }else{     
+            
+            
+            
+    // ----------------- FIND PIPE IN THE COMMAND LINE ----------------------//
+                    // -- DIVIDE COMMANDO FOR THE PIPES --//
+
             char *ArgsCommand[All.size()][maxim + 1];
             for(int i = 0; i < All.size(); i++){
                 for (int j = 0; j < All[i].size(); j++)
@@ -108,7 +147,8 @@ int main()
                 }
                 ArgsCommand[i][All[i].size()] = NULL;
             }
-    //-------------------  INICIALIZED PIPES -----------------------------//
+
+        //---------------  INICIALIZED PIPES -----------------------//
 
             long long allpipes  = All.size() - 1;
             int Pipes[allpipes][2];
@@ -118,29 +158,30 @@ int main()
             int count  = 0;
 
 
-    // ----------------------------- FIRST PROCESS -----------------------//               
+        // ----------------------- FIRST PROCESS -----------------//               
             if(fork() == 0){
-                dup2(Pipes[0][WRITE],WRITE); // abrir canal de lectura
-                close(Pipes[0][READ]);
+                dup2(Pipes[0][WRITE],WRITE); // OPEN CHANNEL WRITE
+                close(Pipes[0][READ]);       // CLOSE CHANNEL READ
                 int path = 1;
-                while(path < allpipes){
+                while(path < allpipes){        // CLOSE OTHER PIPE TAHT NOT UTILIZED
                     close(Pipes[path][READ]);
                     close(Pipes[path][WRITE]);
                     path++;
                 }
-                execvp(ArgsCommand[0][0],ArgsCommand[0]); 
-                printf("error1");
+                execvp(ArgsCommand[0][0],ArgsCommand[0]); // EXECUTING COMMAND
+                
+                printf("error1");           // ERROR 
                 }
 
-    //----------------------------------  PROCESS 2 OR MORE --------------------------//
+        //------------------  PROCESS 2 OR MORE ---------------------//
 
             if(allpipes > 1){
-                // PROCESO 2
+
                 while(count < allpipes - 1){
                     if(fork()==0){
-                        dup2(Pipes[count][READ],READ); // abrir canal de lectura
-                        dup2(Pipes[count + 1][WRITE],WRITE); // abrir canal de escritura
-                        for(int i = 0; i < allpipes; i++){
+                        dup2(Pipes[count][READ],READ); // OPEN CHANNEL READ
+                        dup2(Pipes[count + 1][WRITE],WRITE); // OPEN CHANNEL WRITE
+                        for(int i = 0; i < allpipes; i++){      // CLOSE OTHER PIPE TAHT NOT UTILIZED
                             if(i == count)
                                 close(Pipes[i][WRITE]);
                             else if(i == count + 1) 
@@ -150,22 +191,23 @@ int main()
                                 close(Pipes[i][WRITE]);
                             }
                         }
-                    execvp(ArgsCommand[count + 1][0],ArgsCommand[count + 1]); 
-                    printf("error2");
+                    execvp(ArgsCommand[count + 1][0],ArgsCommand[count + 1]); // EXECUTING COMMAND
+                    printf("error2");   // ERROR 
                 }
                 count++;
                 }
+
             }
 
     // ----------------------------------- FINAL PROCESS ----------------------------------// 
 
             if(fork()==0){
-                // PROCESO 3
-                dup2(Pipes[count][READ],READ); // abrir canal de lectura
-                close(Pipes[count][WRITE]);
+
+                dup2(Pipes[count][READ],READ);      // READ LAST PIPE
+                close(Pipes[count][WRITE]);         // CLOSE CHANNEL WRITE OF THE LAST PIPE
                 int path = 0;
-                //el proceso 3 no utiliza el pipe1
-                while(path < allpipes){
+                
+                while(path < allpipes){         // CLOSE THER PIPES
                     if(path == count){
                         path++;
                         continue;
@@ -174,19 +216,34 @@ int main()
                     close(Pipes[path][WRITE]);
                     path++;
                 }
-                execvp(ArgsCommand[count + 1][0],ArgsCommand[count + 1]); 
-                printf("error3");
+                execvp(ArgsCommand[count + 1][0],ArgsCommand[count + 1]);   // EXECUTE COMMAND
+                printf("error3");           // ERROR
             }
             for (int i = 0; i < allpipes; i++){
                 close(Pipes[i][WRITE]);
                 close(Pipes[i][READ]);                
             }
-            for(int l = 0 ; l < All.size(); l++) wait(NULL);
+            for(int l = 0 ; l < All.size(); l++) wait(NULL); // WAIT CHILDREN
         }
-        USend = process.ru_utime; // FINISHED USER TIME
-        Send = process.ru_stime; //// FINISHED SYSTEM TIME
+
+        getrusage(RUSAGE_SELF , &end);              // GET USER AND SYSTEM TIME, AND MAXRRS
+        usertime = (end.ru_utime.tv_sec - start.ru_utime.tv_sec)*1000000 + end.ru_utime.tv_usec - start.ru_utime.tv_usec;
+        systime = (end.ru_stime.tv_sec - start.ru_stime.tv_sec)*1000000 + end.ru_stime.tv_usec - start.ru_stime.tv_usec;
+        string comando = "";
+
+
+        //  ---------------  GET THE COMMAND LINE ENTERED ------------------//
+        for ( int l = 0; l < All.size(); l++){
+            for (int m = 0; m < All[l].size(); m++){
+                comando += All[l][m] + " ";
+            }
+        }
+        archivo << comando << '\t' << usertime << '\t'<< systime << '\t' << end.ru_maxrss << '\t' << endl;
+
         All.clear();   
-        pront = true;         
+        //pront = true;  
+        cout << endl;
+        cout << "$";     
     }
     return 0;
 }
