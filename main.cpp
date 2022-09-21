@@ -7,7 +7,10 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <algorithm>
-#include <libexplain/execvp.h>
+#include <sys/resource.h>
+using namespace std;
+
+//#include <libexplain/execvp.h>
 
 //#include <bits/stdc++.h>
 //typedef cdo =  'cd /home/test/' 
@@ -16,9 +19,29 @@
 const int READ = 0; // variable para pipe
 const int WRITE = 1; // variable para pipe
 
-using namespace std;
+void sig_handler(int sig){      // manejador de signals
+    cout << " Decia continuar la ejecución de la Shell: (Y/N)" << endl;    
+    char Answer;
+    while(1){
+        cout << "Coloque su respuesta : ";
+        cin >> Answer;
+        if(Answer == 'N'){
+            printf("Adios");
+            exit(0);
+        }else if(Answer == 'Y'){
+            break;
+        }
+    }
+    
+}
+
 int main()
 {
+    signal(SIGINT,sig_handler);
+    struct rusage process;
+    struct timeval UStart, USend, Sstart, Send;          
+    long maxrss = 0;                                              
+    getrusage(RUSAGE_CHILDREN , &process);
     vector<vector<string> > All;
     vector<string> command;
     string instruction;
@@ -28,7 +51,7 @@ int main()
     while (getline(cin,instruction)){ 
         maxim = 0;
         if(pront) cout << "$";
-        pront = false;
+        //pront = false;
         string Chain1;
         if(instruction == "exit"){
             return 0;
@@ -41,7 +64,7 @@ int main()
         {
             string Chain2;
             stringstream S2(Chain1); 
-            while(getline(S2, Chain2 , ' ')){
+            while(getline(S2, Chain2 , ' ')){ // como                 estas
                 command.push_back(Chain2);
             }
             command.erase(std::remove(command.begin(), command.end(), ""), command.end());
@@ -50,7 +73,9 @@ int main()
             All.push_back(command);
             command.clear();
         }
-        // Case only one command 
+        // Case only one command
+        UStart = process.ru_utime;  // IINICIALIZED USER TIME OF THE PROCESS;
+        Sstart = process.ru_utime;  // IINICIALIZED SYS TIME OF THE PROCESS;
         if( All.size() <= 1){
             char *ArgsCommand[All[0].size() + 1];
             int i = 0;
@@ -63,9 +88,9 @@ int main()
             if(pid == 0){        
                 pront = true;
                 int exeret = execvp(ArgsCommand[0],ArgsCommand);
-                fprintf(stderr, "%s\n", Explain_execvp(ArgsCommand[0],ArgsCommand));
+                //fprintf(stderr, "%s\n", Explain_execvp(ArgsCommand[0],ArgsCommand));
                 exit(errno);
-            }else if(pid < 0){
+            }else if(pid < 0){      
                 cout << "ERROR";
                 // ERROR;
             }
@@ -109,56 +134,57 @@ int main()
 
     //----------------------------------  PROCESS 2 OR MORE --------------------------//
 
-                if(allpipes > 1){
-                    // PROCESO 2
-                    while(count < allpipes - 1){
-                        if(fork()==0){
-                            dup2(Pipes[count][READ],READ); // abrir canal de lectura
-                            dup2(Pipes[count + 1][WRITE],WRITE); // abrir canal de escritura
-                            for(int i = 0; i < allpipes; i++){
-                                if(i == count)
-                                    close(Pipes[i][WRITE]);
-                                else if(i == count + 1) 
-                                    close(Pipes[i][READ]);
-                                else{
-                                    close(Pipes[i][READ]);
-                                    close(Pipes[i][WRITE]);
-                                }
+            if(allpipes > 1){
+                // PROCESO 2
+                while(count < allpipes - 1){
+                    if(fork()==0){
+                        dup2(Pipes[count][READ],READ); // abrir canal de lectura
+                        dup2(Pipes[count + 1][WRITE],WRITE); // abrir canal de escritura
+                        for(int i = 0; i < allpipes; i++){
+                            if(i == count)
+                                close(Pipes[i][WRITE]);
+                            else if(i == count + 1) 
+                                close(Pipes[i][READ]);
+                            else{
+                                close(Pipes[i][READ]);
+                                close(Pipes[i][WRITE]);
                             }
-                            execvp(ArgsCommand[count + 1][0],ArgsCommand[count + 1]); 
-                            printf("error2");
                         }
-                        count++;
-                    }
+                    execvp(ArgsCommand[count + 1][0],ArgsCommand[count + 1]); 
+                    printf("error2");
                 }
+                count++;
+                }
+            }
 
     // ----------------------------------- FINAL PROCESS ----------------------------------// 
 
-                if(fork()==0){
-                    // PROCESO 3
-                    dup2(Pipes[count][READ],READ); // abrir canal de lectura
-                    close(Pipes[count][WRITE]);
-                    int path = 0;
-                    //el proceso 3 no utiliza el pipe1
-                    while(path < allpipes){
-                        if(path == count){
-                            path++;
-                            continue;
-                        }
-                        close(Pipes[path][READ]);
-                        close(Pipes[path][WRITE]);
+            if(fork()==0){
+                // PROCESO 3
+                dup2(Pipes[count][READ],READ); // abrir canal de lectura
+                close(Pipes[count][WRITE]);
+                int path = 0;
+                //el proceso 3 no utiliza el pipe1
+                while(path < allpipes){
+                    if(path == count){
                         path++;
+                        continue;
                     }
-                    execvp(ArgsCommand[count + 1][0],ArgsCommand[count + 1]); 
-                    printf("error3");
+                    close(Pipes[path][READ]);
+                    close(Pipes[path][WRITE]);
+                    path++;
                 }
-                for (int i = 0; i < allpipes; i++){
-                    close(Pipes[i][WRITE]);
-                    close(Pipes[i][READ]);                
-                }
-                for(int l = 0 ; l < All.size(); l++) wait(NULL);
+                execvp(ArgsCommand[count + 1][0],ArgsCommand[count + 1]); 
+                printf("error3");
             }
-        
+            for (int i = 0; i < allpipes; i++){
+                close(Pipes[i][WRITE]);
+                close(Pipes[i][READ]);                
+            }
+            for(int l = 0 ; l < All.size(); l++) wait(NULL);
+        }
+        USend = process.ru_utime; // FINISHED USER TIME
+        Send = process.ru_stime; //// FINISHED SYSTEM TIME
         All.clear();   
         pront = true;         
     }
