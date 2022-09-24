@@ -6,17 +6,21 @@
 #include <istream>
 #include <sstream>
 #include <fstream>
+#include <limits>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <algorithm>
 #include <sys/resource.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdio_ext.h>
+#include <unistd.h>
+#include <fcntl.h>
+
 using namespace std;
 
 const int READ = 0; // variable para pipe
 const int WRITE = 1; // variable para pipe
-vector<vector<string> > All;
-    vector<string> command;
-    string instruction;
 
 void sig_handler(int sig){      // manejador de signals
     cout << " Decia continuar la ejecución de la Shell: (Y/N)" << endl;    
@@ -24,24 +28,49 @@ void sig_handler(int sig){      // manejador de signals
     while(1){
         cout << "Coloque su respuesta : ";
         cin >> Answer;
+        cin.ignore(numeric_limits<streamsize>::max(),'\n');
         if(Answer == 'N'){
             printf("Adios");
             exit(0);
         }else if(Answer == 'Y'){
-            All.clear();
-            instruction.clear();
-            command.clear();
+            cin.clear();
+            int fdflags;
+            fdflags = fcntl(STDIN_FILENO, F_GETFL, 0);
+            fcntl(STDIN_FILENO, F_SETFL, fdflags | O_NONBLOCK);
+            printf("ERROR");
+            while (getchar()!=EOF){
+            };
+            printf("ERROR");
+            fcntl(STDIN_FILENO, F_SETFL, fdflags);
             break;
         }
+    }
+}
+void sigUSR(int sig){
+    if(sig == SIGUSR1){
+        cout << "Estoy aca " ;
+        exit(0);
     }
 }
 
 int main()
 {
+    /*struct sigaction sa;
+    sa.sa_handler = sig_handler;
+    int k = 0;
+    sigaction(SIGINT, &sa, NULL);*/
     signal(SIGINT,sig_handler);
+    signal(SIGUSR1, sigUSR);
+    
+    int pid=getpid();      //Process ID of itself
+    kill(pid,SIGUSR1);       
+
     struct rusage start,end;
     long int usertime, systime;
-    long maxrss = 0;                                              
+    long maxrss = 0;            
+    vector<vector<string> > All;
+    vector<string> command;
+    string instruction;                                  
     //vector<vector<string> > All;
     bool pront = true;
     cout << "$";
@@ -49,9 +78,12 @@ int main()
     long long maxim;
     //archivo.clear();
     bool dates = false; // Flag of the recurses, if is true. write , else close
+    //while(1){
+      //  cout << "Ingrese Comando" << endl;
     while (getline(cin,instruction)){ 
         cout << "comando : " << instruction<< endl;
         maxim = 0;
+        //instruction = "ls";
         //if(pront) cout << "$";
         pront = false;
         string Chain1;
@@ -59,7 +91,6 @@ int main()
             return 0;
         }else if(instruction.size() == 0 ){
             pront = true;
-            cout << "juju:";
             continue;
         }
         stringstream S1(instruction);
@@ -109,7 +140,7 @@ int main()
 // -------------------  CASO DE UNA LIENA DE COMANDO COMO ls - la sin necesidad de pipe's ----------------------- //
 
         if( All.size() <= 1){
-            cout << "Cai aca";
+            cout << "Cai aca : " << instruction << endl;
             char *ArgsCommand[All[0].size() + 1];
             int i = 0;
             for(i; i < All[0].size(); i++){
@@ -243,8 +274,13 @@ int main()
         All.clear();   
         //pront = true;  
         cout << endl;
+        instruction.clear();
+     
         cout << "$";     
+        //break;
     }
+
+  //}
     return 0;
 }
 /*for (int l =  0; l < All.size(); l++){
