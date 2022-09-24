@@ -8,6 +8,7 @@
 #include <fstream>
 #include <limits>
 #include <unistd.h>
+#include <bits/stdc++.h>
 #include <sys/wait.h>
 #include <algorithm>
 #include <sys/resource.h>
@@ -21,6 +22,56 @@ using namespace std;
 
 const int READ = 0; // variable para pipe
 const int WRITE = 1; // variable para pipe
+
+int Input_Command(string instruction, long long &maxim, vector<vector<string>> &All){
+        vector<string> command;
+        string Chain1;
+        if(instruction == "exit"){
+            exit(0);
+        }else if(instruction.size() == 0 ){
+            All.clear();   
+            cout << "$";     
+            return 1;
+        }
+        stringstream S1(instruction);
+        while (getline(S1 , Chain1 , '|'))
+        {
+            string Chain2;
+            stringstream S2(Chain1); 
+            while(getline(S2, Chain2 , ' ')){ // como                 estas
+                string chars = "\"";
+                Chain2.erase(remove_if(Chain2.begin(), Chain2.end(),[&chars](const char &c) {return chars.find(c) != string::npos;}),Chain2.end());
+                command.push_back(Chain2);
+            }
+            command.erase(std::remove(command.begin(), command.end(), ""), command.end());
+
+            long long m = command.size();
+            maxim = max(m, maxim);
+            All.push_back(command);
+            command.clear();
+        }
+        return 0;
+}
+
+void Command_without_pipe(vector<vector<string>> All){
+    char *ArgsCommand[All[0].size() + 1];
+    int i = 0;
+    for(i; i < All[0].size(); i++){
+        ArgsCommand[i] = strdup(All[0][i].c_str());
+    }
+    ArgsCommand[i] = NULL;
+    int pid = fork();
+    if(pid == 0){        
+        //pront = true;
+        int exeret = execvp(ArgsCommand[0],ArgsCommand);
+        exit(EXIT_FAILURE);
+    }else if(pid < 0){      
+        cout << "ERROR AL CREAR HIJO";
+    }
+    else{
+        wait(NULL);
+    }
+}
 
 void sig_handler(int sig){      // manejador de signals
     cout << " Decia continuar la ejecución de la Shell: (Y/N)" << endl;    
@@ -37,134 +88,89 @@ void sig_handler(int sig){      // manejador de signals
             int fdflags;
             fdflags = fcntl(STDIN_FILENO, F_GETFL, 0);
             fcntl(STDIN_FILENO, F_SETFL, fdflags | O_NONBLOCK);
-            printf("ERROR");
             while (getchar()!=EOF){
             };
-            printf("ERROR");
             fcntl(STDIN_FILENO, F_SETFL, fdflags);
             break;
         }
     }
 }
+
 void sigUSR(int sig){
     if(sig == SIGUSR1){
-        cout << "Estoy aca " ;
-        exit(0);
+        cout << "Gracias por comunicarte conmigo hijo mayor, sigue con tu labor en las pipes" << endl;
+    }else if(sig == SIGUSR2){  
+        cout << "Buen dia hijo menos que buen que estes terminando las tuberias que les propuse" << endl;
     }
 }
 
 int main()
 {
-    /*struct sigaction sa;
-    sa.sa_handler = sig_handler;
-    int k = 0;
-    sigaction(SIGINT, &sa, NULL);*/
-    signal(SIGINT,sig_handler);
-    signal(SIGUSR1, sigUSR);
-    
-    int pid=getpid();      //Process ID of itself
-    kill(pid,SIGUSR1);       
-
+    signal(SIGINT,sig_handler);    
+    //signal(SIGUSR1,sigUSR);    
     struct rusage start,end;
     long int usertime, systime;
     long maxrss = 0;            
     vector<vector<string> > All;
-    vector<string> command;
     string instruction;                                  
-    //vector<vector<string> > All;
     bool pront = true;
     cout << "$";
     ofstream archivo;
     long long maxim;
-    //archivo.clear();
     bool dates = false; // Flag of the recurses, if is true. write , else close
-    //while(1){
-      //  cout << "Ingrese Comando" << endl;
     while (getline(cin,instruction)){ 
-        cout << "comando : " << instruction<< endl;
         maxim = 0;
-        //instruction = "ls";
-        //if(pront) cout << "$";
-        pront = false;
-        string Chain1;
-        if(instruction == "exit"){
-            return 0;
-        }else if(instruction.size() == 0 ){
-            pront = true;
+        cout << "instruction " << instruction<< endl;
+        int ret = Input_Command(instruction,maxim,All);
+        /*for (int l =  0; l < All.size(); l++){
+            for(auto &x : All[l]){
+            cout << x << endl;
+        }*/
+    //cout << endl;
+    //}
+        if(ret == 1){
+            instruction.clear();
             continue;
-        }
-        stringstream S1(instruction);
-        while (getline(S1 , Chain1 , '|'))
-        {
-            string Chain2;
-            stringstream S2(Chain1); 
-            while(getline(S2, Chain2 , ' ')){ // como                 estas
-                command.push_back(Chain2);
-            }
-            command.erase(std::remove(command.begin(), command.end(), ""), command.end());
-            long long m = command.size();
-            maxim = max(m, maxim);
-            All.push_back(command);
-            command.clear();
-        }
-        getrusage(RUSAGE_SELF , &start);
+        }   
+
+        getrusage(RUSAGE_CHILDREN , &start);
         // Case only one command
+
+// ----------------------- CHECK IF IT IS "usorecursos start 'archivo'" ---------------------------------//
 
         // Caso para abrir el archivo recursos.log, es decir == 3 para pdoer verifficar que sea ese comandoapra comenzar la escritura de datos
         // si el tamano es 2 es para cortar la escirutra 
+       
         if(All[0].size() == 3){
-            string L = All[0][0] + " " + All[0][1] + " " + All[0][2];
-            if(L == "usorecursos start recursos.log"){
+            string L = All[0][0] + " " + All[0][1];// + " " + All[0][2];
+            if(L == "usorecursos start"){
                 dates = true;
-                string nombreArchivo = "recursos.log";
-		                            // OPEN FILE
+                string nombreArchivo = All[0][2];
+		        // OPEN FILE
 		        archivo.open(nombreArchivo.c_str(), fstream::out);
-		                        // WRITE IN THE DILE
+		        // WRITE IN THE DILE
 		        archivo << "comando" << '\t' << "tuser" << '\t'<< "tsys" << '\t' << "maxrss" << '\t' << endl;
                 All.clear();
-                cout << endl;
                 cout << "$";   
                 continue;
-            }
+            }   
         }else if(All[0].size() == 2 && dates == true){
             string L = All[0][0] + " " + All[0][1];
-            if(L == "usorecursos stop" && dates == true){
+            if(L == "usorecursos stop"){
+                dates = false;
                 archivo.close();
-                cout << endl;
                 cout << "$";   
                 All.clear();
                 continue;
             }
+        
         }
 
 // -------------------  CASO DE UNA LIENA DE COMANDO COMO ls - la sin necesidad de pipe's ----------------------- //
 
         if( All.size() <= 1){
-            cout << "Cai aca : " << instruction << endl;
-            char *ArgsCommand[All[0].size() + 1];
-            int i = 0;
-            for(i; i < All[0].size(); i++){
-                ArgsCommand[i] = strdup(All[0][i].c_str());
-            }
-            ArgsCommand[i] = NULL;
-            int pid = fork();
-            if(pid == 0){        
-                pront = true;
-                int exeret = execvp(ArgsCommand[0],ArgsCommand);
-                
-                //fprintf(stderr, "%s\n", explain_execvp(ArgsCommand[0],ArgsCommand));
-                exit(EXIT_FAILURE);
-            }else if(pid < 0){      
-                cout << "ERROR";
-                // ERROR;
-            }
-            else{
-                wait(NULL);
-
-            }
+            Command_without_pipe(All);
         }else{     
-            
-            
             
     // ----------------- FIND PIPE IN THE COMMAND LINE ----------------------//
                     // -- DIVIDE COMMANDO FOR THE PIPES --//
@@ -174,8 +180,9 @@ int main()
                 for (int j = 0; j < All[i].size(); j++)
                 {
                     ArgsCommand[i][j] = strdup(All[i][j].c_str()); 
-                    //cout << ArgsCommand[i][j] << " ";
+                   // cout << ArgsCommand[i][j] << " ";
                 }
+                //cout <<  endl;
                 ArgsCommand[i][All[i].size()] = NULL;
             }
 
@@ -189,8 +196,11 @@ int main()
             int count  = 0;
 
 
-        // ----------------------- FIRST PROCESS -----------------//               
+        // ----------------------- FIRST PROCESS -----------------// 
+            //pid_t pid1 = fork();   
+            //kill(pid1,SIGUSR1);
             if(fork() == 0){
+                //signal(SIGUSR2,sigUSR);
                 dup2(Pipes[0][WRITE],WRITE); // OPEN CHANNEL WRITE
                 close(Pipes[0][READ]);       // CLOSE CHANNEL READ
                 int path = 1;
@@ -199,10 +209,10 @@ int main()
                     close(Pipes[path][WRITE]);
                     path++;
                 }
+                //kill(getppid(),SIGUSR1);
                 execvp(ArgsCommand[0][0],ArgsCommand[0]); // EXECUTING COMMAND
-                
                 printf("error1");           // ERROR 
-                }
+            }
 
         //------------------  PROCESS 2 OR MORE ---------------------//
 
@@ -227,17 +237,15 @@ int main()
                 }
                 count++;
                 }
-
             }
 
     // ----------------------------------- FINAL PROCESS ----------------------------------// 
-
+            //pid_t pid3 = fork();
             if(fork()==0){
-
                 dup2(Pipes[count][READ],READ);      // READ LAST PIPE
                 close(Pipes[count][WRITE]);         // CLOSE CHANNEL WRITE OF THE LAST PIPE
                 int path = 0;
-                
+
                 while(path < allpipes){         // CLOSE THER PIPES
                     if(path == count){
                         path++;
@@ -254,33 +262,30 @@ int main()
                 close(Pipes[i][WRITE]);
                 close(Pipes[i][READ]);                
             }
+
             for(int l = 0 ; l < All.size(); l++) wait(NULL); // WAIT CHILDREN
         }
 
-        getrusage(RUSAGE_SELF , &end);              // GET USER AND SYSTEM TIME, AND MAXRRS
+
+        getrusage(RUSAGE_CHILDREN , &end);              // GET USER AND SYSTEM TIME, AND MAXRRS
         usertime = (end.ru_utime.tv_sec - start.ru_utime.tv_sec)*1000000 + end.ru_utime.tv_usec - start.ru_utime.tv_usec;
         systime = (end.ru_stime.tv_sec - start.ru_stime.tv_sec)*1000000 + end.ru_stime.tv_usec - start.ru_stime.tv_usec;
         string comando = "";
 
 
         //  ---------------  GET THE COMMAND LINE ENTERED ------------------//
+
         for ( int l = 0; l < All.size(); l++){
-            for (int m = 0; m < All[l].size(); m++){
-                comando += All[l][m] + " ";
-            }
+            for (int m = 0; m < All[l].size(); m++) comando += All[l][m] + " ";
+            
         }
+        
         archivo << comando << '\t' << usertime << '\t'<< systime << '\t' << end.ru_maxrss << '\t' << endl;
 
         All.clear();   
-        //pront = true;  
-        cout << endl;
         instruction.clear();
-     
         cout << "$";     
-        //break;
     }
-
-  //}
     return 0;
 }
 /*for (int l =  0; l < All.size(); l++){
@@ -297,3 +302,32 @@ for(i; i < All.size(); i++){
     }
     cout << endl; //ArgsCommand[i]
 }*/
+        /*//instruction = "ls";
+        //if(pront) cout << "$";
+        //pront = false;
+        string Chain1;
+        if(instruction == "exit"){
+            return 0;
+        }else if(instruction.size() == 0 ){
+            pront = true;
+            All.clear();   
+            //pront = true;  
+            //cout << endl;
+            instruction.clear();   
+            cout << "$";     
+            continue;
+        }
+        stringstream S1(instruction);
+        while (getline(S1 , Chain1 , '|'))
+        {
+            string Chain2;
+            stringstream S2(Chain1); 
+            while(getline(S2, Chain2 , ' ')){ // como                 estas
+                command.push_back(Chain2);
+            }
+            command.erase(std::remove(command.begin(), command.end(), ""), command.end());
+            long long m = command.size();
+            maxim = max(m, maxim);
+            All.push_back(command);
+            command.clear();
+        }*/
