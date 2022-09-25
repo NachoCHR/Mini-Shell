@@ -19,10 +19,19 @@
 #include <fcntl.h>
 
 using namespace std;
-
+int x = 0;
 const int READ = 0; // variable para pipe
 const int WRITE = 1; // variable para pipe
 
+void sigUSR(int sig){
+    if(sig == SIGUSR1){
+        cout << "Papi, Comence a realizar el comando, en un par de segundos estara listo" << endl;
+        sleep(1);
+        kill(getppid(),SIGUSR2);
+    }else if(sig == SIGUSR2){
+        cout << "Okey, mi muchacho, esperando a que lo termines... " << endl;
+    }
+}
 int Input_Command(string instruction, long long &maxim, vector<vector<string>> &All){
         vector<string> command;
         string Chain1;
@@ -30,7 +39,7 @@ int Input_Command(string instruction, long long &maxim, vector<vector<string>> &
             exit(0);
         }else if(instruction.size() == 0 ){
             All.clear();   
-            cout << "$";     
+            cout << "shell$";     
             return 1;
         }
         stringstream S1(instruction);
@@ -62,6 +71,9 @@ void Command_without_pipe(vector<vector<string>> All){
     ArgsCommand[i] = NULL;
     int pid = fork();
     if(pid == 0){        
+        signal(SIGUSR1,sigUSR);    
+        kill(getppid(),SIGUSR2);
+        sleep(1);
         //pront = true;
         int exeret = execvp(ArgsCommand[0],ArgsCommand);
         exit(EXIT_FAILURE);
@@ -69,6 +81,8 @@ void Command_without_pipe(vector<vector<string>> All){
         cout << "ERROR AL CREAR HIJO";
     }
     else{
+        signal(SIGUSR2,sigUSR);
+        kill(pid,SIGUSR1);
         wait(NULL);
     }
 }
@@ -77,11 +91,12 @@ void sig_handler(int sig){      // manejador de signals
     cout << " Decia continuar la ejecución de la Shell: (Y/N)" << endl;    
     char Answer;
     while(1){
+        x = 0;
         cout << "Coloque su respuesta : ";
         cin >> Answer;
         cin.ignore(numeric_limits<streamsize>::max(),'\n');
         if(Answer == 'N'){
-            printf("Adios");
+            printf("Adios\n");
             exit(0);
         }else if(Answer == 'Y'){
             cin.clear();
@@ -96,43 +111,29 @@ void sig_handler(int sig){      // manejador de signals
     }
 }
 
-void sigUSR(int sig){
-    if(sig == SIGUSR1){
-        cout << "Gracias por comunicarte conmigo hijo mayor, sigue con tu labor en las pipes" << endl;
-    }else if(sig == SIGUSR2){  
-        cout << "Buen dia hijo menos que buen que estes terminando las tuberias que les propuse" << endl;
-    }
-}
+
 
 int main()
 {
     signal(SIGINT,sig_handler);    
-    //signal(SIGUSR1,sigUSR);    
+    signal(SIGUSR1,sigUSR);    
     struct rusage start,end;
     long int usertime, systime;
     long maxrss = 0;            
     vector<vector<string> > All;
     string instruction;                                  
     bool pront = true;
-    cout << "$";
+    cout << "Shell$";
     ofstream archivo;
     long long maxim;
     bool dates = false; // Flag of the recurses, if is true. write , else close
     while (getline(cin,instruction)){ 
         maxim = 0;
-        cout << "instruction " << instruction<< endl;
         int ret = Input_Command(instruction,maxim,All);
-        /*for (int l =  0; l < All.size(); l++){
-            for(auto &x : All[l]){
-            cout << x << endl;
-        }*/
-    //cout << endl;
-    //}
         if(ret == 1){
             instruction.clear();
             continue;
         }   
-
         getrusage(RUSAGE_CHILDREN , &start);
         // Case only one command
 
@@ -151,7 +152,7 @@ int main()
 		        // WRITE IN THE DILE
 		        archivo << "comando" << '\t' << "tuser" << '\t'<< "tsys" << '\t' << "maxrss" << '\t' << endl;
                 All.clear();
-                cout << "$";   
+                cout << "Shell$";   
                 continue;
             }   
         }else if(All[0].size() == 2 && dates == true){
@@ -159,11 +160,10 @@ int main()
             if(L == "usorecursos stop"){
                 dates = false;
                 archivo.close();
-                cout << "$";   
+                cout << "Shell$";   
                 All.clear();
                 continue;
             }
-        
         }
 
 // -------------------  CASO DE UNA LIENA DE COMANDO COMO ls - la sin necesidad de pipe's ----------------------- //
@@ -284,7 +284,7 @@ int main()
 
         All.clear();   
         instruction.clear();
-        cout << "$";     
+        cout << "Shell$";     
     }
     return 0;
 }
@@ -295,7 +295,7 @@ int main()
     cout << endl;
 }*/
 /*
-for(i; i < All.size(); i++){
+for(i; i < All.size(); i++){pid1
     for (int j = 0; j < All[i].size(); j++)
     {
         cout << ArgsCommand[i][j] << " ";// = strdup(All[i][j].c_str()); 
@@ -303,7 +303,7 @@ for(i; i < All.size(); i++){
     cout << endl; //ArgsCommand[i]
 }*/
         /*//instruction = "ls";
-        //if(pront) cout << "$";
+        //if(pront) cout << "shell$";
         //pront = false;
         string Chain1;
         if(instruction == "exit"){
