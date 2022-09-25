@@ -90,7 +90,6 @@ void sig_handler(int sig){      // manejador de signals
     cout << " Decia continuar la ejecución de la Shell: (Y/N)" << endl;    
     char Answer;
     while(1){
-        x = 0;
         cout << "Coloque su respuesta : ";
         cin >> Answer;
         cin.ignore(numeric_limits<streamsize>::max(),'\n');
