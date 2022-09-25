@@ -17,16 +17,16 @@
 #include <stdio_ext.h>
 #include <unistd.h>
 #include <fcntl.h>
-
+#include<cstdlib> //arriba en el inicio del codigo 
+#define GRN "\e[0;32m"
+#define NC "\e[0m" 
 using namespace std;
-int x = 0;
 const int READ = 0; // variable para pipe
 const int WRITE = 1; // variable para pipe
 
 void sigUSR(int sig){
     if(sig == SIGUSR1){
         cout << "Papi, Comence a realizar el comando, en un par de segundos estara listo" << endl;
-        sleep(1);
         kill(getppid(),SIGUSR2);
     }else if(sig == SIGUSR2){
         cout << "Okey, mi muchacho, esperando a que lo termines... " << endl;
@@ -39,7 +39,8 @@ int Input_Command(string instruction, long long &maxim, vector<vector<string>> &
             exit(0);
         }else if(instruction.size() == 0 ){
             All.clear();   
-            cout << "shell$";     
+            cout << GRN "Shell$";
+            cout << NC;
             return 1;
         }
         stringstream S1(instruction);
@@ -73,8 +74,6 @@ void Command_without_pipe(vector<vector<string>> All){
     if(pid == 0){        
         signal(SIGUSR1,sigUSR);    
         kill(getppid(),SIGUSR2);
-        sleep(1);
-        //pront = true;
         int exeret = execvp(ArgsCommand[0],ArgsCommand);
         exit(EXIT_FAILURE);
     }else if(pid < 0){      
@@ -123,7 +122,8 @@ int main()
     vector<vector<string> > All;
     string instruction;                                  
     bool pront = true;
-    cout << "Shell$";
+    cout << GRN "Shell$";
+    cout << NC;
     ofstream archivo;
     long long maxim;
     bool dates = false; // Flag of the recurses, if is true. write , else close
@@ -150,9 +150,10 @@ int main()
 		        // OPEN FILE
 		        archivo.open(nombreArchivo.c_str(), fstream::out);
 		        // WRITE IN THE DILE
-		        archivo << "comando" << '\t' << "tuser" << '\t'<< "tsys" << '\t' << "maxrss" << '\t' << endl;
+		        archivo << "comando" << "\t\t\t" << "tuser" << "\t\t\t"<< "tsys" << "\t\t\t" << "maxrss" << '\t' << endl;
                 All.clear();
-                cout << "Shell$";   
+                cout << GRN "Shell$";
+                cout << NC;
                 continue;
             }   
         }else if(All[0].size() == 2 && dates == true){
@@ -160,7 +161,8 @@ int main()
             if(L == "usorecursos stop"){
                 dates = false;
                 archivo.close();
-                cout << "Shell$";   
+                cout << GRN "Shell$";
+                cout << NC;
                 All.clear();
                 continue;
             }
@@ -280,11 +282,11 @@ int main()
             
         }
         
-        archivo << comando << '\t' << usertime << '\t'<< systime << '\t' << end.ru_maxrss << '\t' << endl;
-
+        archivo << comando << "\t\t\t" << usertime << "[ms]" << "\t\t\t" << systime << "[ms]" << "\t\t\t" << end.ru_maxrss << "[kb]" << '\t' << endl;
         All.clear();   
         instruction.clear();
-        cout << "Shell$";     
+        cout << GRN "Shell$";
+        cout << NC;
     }
     return 0;
 }
